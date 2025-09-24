@@ -1,0 +1,10 @@
+# virtualenv
+.venv*
+venv/
+ENV/
+
+# Dev-time folders
+/storage/
+/tests/
+/research_scripts/
+.nox/

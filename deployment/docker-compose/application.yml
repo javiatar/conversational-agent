@@ -1,0 +1,40 @@
+name: conversational-agent
+
+x-api-healthcheck: &apiHealthcheck
+  test:
+    - "CMD-SHELL"
+    - |
+      python -c '
+      import sys
+      import urllib.request
+
+      result = urllib.request.urlopen("http://localhost:5020/health")
+      if not (200 <= result.status < 300):
+        sys.exit(1)
+      ',
+  interval: 5s
+  timeout: 10s
+  retries: 20
+
+services:
+  conversational-agent-api:
+    image:  conversational-agent-api:latest
+    ports:
+      - published: "5020"
+        target: "5020"
+    command:
+      - python3
+      - -m
+      - uvicorn 
+      - conversational-agent.core.api.endpoints:app 
+      - --host 0.0.0.0 
+      - --port 5020
+      
+    networks:
+      conversational-agent-internal: {}
+      conversational-agent-external: {}
+    healthcheck: *apiHealthcheck
+
+networks:
+  conversational-agent-internal: {}
+  conversational-agent-external: {}

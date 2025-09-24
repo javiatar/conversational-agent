@@ -1,0 +1,8 @@
+services:
+  build-img:
+    image: conversational-agent-api:latest
+    build:
+      context: ../../
+      dockerfile: deployment/Dockerfile
+      args:
+        BASE_IMAGE: python:3.11-slim-bookworm
