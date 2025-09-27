@@ -38,7 +38,8 @@ class UrgencyLevel(StrEnum):
 
 class Role(StrEnum):
     USER = "user"
-    AGENT = "agent"
+    ASSISTANT = "assistant"
+    SYSTEM = "system"
 
 
 class Customer(SQLModel, table=True):

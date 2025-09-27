@@ -46,7 +46,7 @@ def get_db_config() -> DatabaseConfig:
 def create_engine() -> AsyncEngine:
     """Create the SQLAlchemy engine."""
     db_config = get_db_config()
-    return create_async_engine(db_config.url, echo=True, future=True)
+    return create_async_engine(db_config.url, future=True)
 
 
 async def init_db() -> None:

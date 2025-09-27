@@ -8,6 +8,7 @@ from conversational_agent.data_models.api_models import (
     StartConversationResponse,
 )
 from conversational_agent.data_models.db_models import Conversation, Customer, Role, Turn
+from conversational_agent.data_models.ml_models import SYSTEM_MESSAGE
 from conversational_agent.utils import singleton
 
 
@@ -36,21 +37,23 @@ class AgentService:
         conversation = Conversation(customer_id=request.customer_id)
         session.add(conversation)
 
-        # Create initial turn that will then be used as context for the ML model to start investigating the issue
+        # Create initial system turn (hidden from user) to ground ML model and its objective
+        system_turn = Turn(role=Role.SYSTEM, text=SYSTEM_MESSAGE, conversation_id=conversation.id)
+
+        # Create initial user turn (visible to user) to start the conversation
         initial_greeting = (
             f"Welcome to {self.agent_name}! I'm a Support Agent explicitly designed "
             "to triage any issues you may have in order to get you the help you need as quickly "
             "as possible. How can I assist you today?"
         )
-        initial_turn = Turn(role=Role.AGENT, text=initial_greeting, conversation_id=conversation.id)
-        session.add(initial_turn)
-
-        return StartConversationResponse(
-            conversation_id=conversation.id,
-            message=initial_turn.text
+        initial_turn = Turn(
+            role=Role.ASSISTANT, text=initial_greeting, conversation_id=conversation.id
         )
+        session.add_all([system_turn, initial_turn])
+
+        return StartConversationResponse(conversation_id=conversation.id, message=initial_turn.text)
 
 
 @singleton
-def get_service() -> AgentService:
+def get_agent_service() -> AgentService:
     return AgentService()

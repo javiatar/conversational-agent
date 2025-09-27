@@ -1,6 +1,12 @@
 """Fake frontend for testing purposes"""
 
+from logging import getLogger
+
 import requests
+
+from conversational_agent.data_models.db_models import IssueStatus
+
+logger = getLogger(__name__)
 
 BASE_URL = "http://localhost:5020/agent"
 
@@ -34,7 +40,7 @@ def start_conversation(customer_id: str) -> str:
 
 def chat_loop(conversation_id: str):
     while True:
-        user_msg = input("You: ").strip()
+        user_msg = input("😁 You: ").strip()
         if not user_msg or user_msg.lower() in {"quit", "exit"}:
             print("👋 Ending conversation. Goodbye!")
             break
@@ -45,9 +51,21 @@ def chat_loop(conversation_id: str):
         data = response.json()
 
         print(f"🤖 Agent: {data['reply']}")
-        if not data.get("missing_fields"):
-            print("✅ All required information collected.")
-            break
+        match data.get("status"):
+            case IssueStatus.RESOLVED:
+                print("✅ Your issue has been marked as resolved. Ending conversation.")
+                break
+            case IssueStatus.CLOSED:
+                print("✅ Your issue has been marked as closed. Ending conversation.")
+                break
+            case IssueStatus.REQUIRES_MANUAL_REVIEW:
+                print(
+                    "⚠️ Your issue requires manual review by a human agent. "
+                    "You will be contacted on your registered email shortly. Ending conversation."
+                )
+                break
+            case _:
+                logger.info(f"ℹ️ Current issue status: {data.get('status')}")
 
 
 if __name__ == "__main__":
