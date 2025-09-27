@@ -1,8 +1,8 @@
 from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
 from http.client import HTTPException
 from logging import getLogger
 
+from fastapi import Depends
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy.ext.asyncio import (
@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 from sqlmodel import SQLModel
+from typing_extensions import Annotated
 
 # Ensure models are imported so SQLModel metadata is populated
 import conversational_agent.data_models  # noqa: F401
@@ -54,7 +55,6 @@ async def init_db() -> None:
         await conn.run_sync(SQLModel.metadata.create_all)
 
 
-@asynccontextmanager
 async def get_session() -> AsyncIterator[AsyncSession]:
     """Context manager to get a new database session from the configured engine."""
     session_maker = async_sessionmaker(create_engine(), expire_on_commit=False)
@@ -71,3 +71,7 @@ async def get_session() -> AsyncIterator[AsyncSession]:
         raise
     finally:
         await session.close()
+
+
+# Annotated fastapi dependency for getting DB session
+SessionDep = Annotated[AsyncSession, Depends(get_session)]

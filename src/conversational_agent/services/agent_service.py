@@ -1,31 +1,56 @@
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
-from conversational_agent.config.dependencies.postgres import get_session
 from conversational_agent.data_models.api_models import (
-    AgentServiceLogInRequest,
-    AgentServiceLogInResponse,
+    LogInRequest,
+    LogInResponse,
+    StartConversationRequest,
+    StartConversationResponse,
 )
-from conversational_agent.data_models.db_models import Customer
+from conversational_agent.data_models.db_models import Conversation, Customer, Role, Turn
 from conversational_agent.utils import singleton
 
 
-@singleton
 class AgentService:
-    async def log_in_user(self, request: AgentServiceLogInRequest) -> AgentServiceLogInResponse:
-        async with get_session() as session:
-            # Check if user exists
-            result = await session.execute(select(Customer).where(Customer.email == request.email))
-            customer = result.scalar_one_or_none()
-            new_user = False
+    agent_name: str = "FakeAgentWhoDefinitelyCaresAboutYou"
 
-            if customer is None:
-                # Customer is new (didn't previously exist), create them
-                new_user = True
-                customer = Customer(name=request.name, email=request.email)
-                session.add(customer)
-                await session.commit()
-                await session.refresh(customer)
+    async def log_in_user(self, request: LogInRequest, session: AsyncSession) -> LogInResponse:
+        # Check if user exists
+        result = await session.execute(select(Customer).where(Customer.email == request.email))
+        customer = result.scalar_one_or_none()
+        new_user = False
 
-            return AgentServiceLogInResponse(
-                id=customer.id, name=customer.name, email=customer.email, new_user=new_user
-            )
+        if customer is None:
+            # Customer is new (didn't previously exist), create them
+            new_user = True
+            customer = Customer(name=request.name, email=request.email)
+            session.add(customer)
+
+        return LogInResponse(
+            id=customer.id, name=customer.name, email=customer.email, new_user=new_user
+        )
+
+    async def start_conversation(
+        self, request: StartConversationRequest, session: AsyncSession
+    ) -> StartConversationResponse:
+        conversation = Conversation(customer_id=request.customer_id)
+        session.add(conversation)
+
+        # Create initial turn that will then be used as context for the ML model to start investigating the issue
+        initial_greeting = (
+            f"Welcome to {self.agent_name}! I'm a Support Agent explicitly designed "
+            "to triage any issues you may have in order to get you the help you need as quickly "
+            "as possible. How can I assist you today?"
+        )
+        initial_turn = Turn(role=Role.AGENT, text=initial_greeting, conversation_id=conversation.id)
+        session.add(initial_turn)
+
+        return StartConversationResponse(
+            conversation_id=conversation.id,
+            message=initial_turn.text
+        )
+
+
+@singleton
+def get_service() -> AgentService:
+    return AgentService()
