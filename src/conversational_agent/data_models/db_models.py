@@ -10,6 +10,7 @@
 
 from datetime import datetime, timezone
 from enum import StrEnum
+from typing import Optional
 from uuid import UUID, uuid4
 
 from sqlmodel import Field, Relationship, SQLModel
@@ -59,7 +60,7 @@ class Conversation(SQLModel, table=True):
     # A conversation can optionally be linked to a single issue
     issue_id: UUID | None = Field(default=None, foreign_key="issue.id")
     # NO CASCADE: Deleting a conversations should not delete the issue
-    issue: "Issue | None" = Relationship(back_populates="conversations")
+    issue: Optional["Issue"] = Relationship(back_populates="conversations")
 
 
 class Turn(SQLModel, table=True):
