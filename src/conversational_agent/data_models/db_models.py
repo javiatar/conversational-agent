@@ -23,6 +23,13 @@ class IssueType(StrEnum):
     OTHER = "other"
 
 
+class IssueStatus(StrEnum):
+    IN_PROGRESS = "in_progress"
+    RESOLVED = "resolved"
+    CLOSED = "closed"
+    REQUIRES_MANUAL_REVIEW = "requires_manual_review"
+
+
 class UrgencyLevel(StrEnum):
     LOW = "low"
     MEDIUM = "medium"
@@ -31,8 +38,7 @@ class UrgencyLevel(StrEnum):
 
 class Role(StrEnum):
     USER = "user"
-    ASSISTANT = "assistant"
-    SYSTEM = "system"
+    AGENT = "agent"
 
 
 class Customer(SQLModel, table=True):
@@ -47,7 +53,7 @@ class Customer(SQLModel, table=True):
 
 
 class Conversation(SQLModel, table=True):
-    id: UUID = Field(primary_key=True)
+    id: UUID = Field(default_factory=uuid4, primary_key=True)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
     # A conversation consists of multiple turns
@@ -81,6 +87,7 @@ class Issue(SQLModel, table=True):
     )
     issue_type: IssueType = Field(default=IssueType.OTHER)
     urgency: UrgencyLevel = Field(default=UrgencyLevel.MEDIUM)
+    status: IssueStatus = Field(default=IssueStatus.IN_PROGRESS)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
     # Each issue is linked to a customer (who can have 0+ issues)
