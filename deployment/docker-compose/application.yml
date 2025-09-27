@@ -26,9 +26,11 @@ services:
       - python3
       - -m
       - uvicorn 
-      - conversational-agent.core.api.endpoints:app 
-      - --host 0.0.0.0 
-      - --port 5020
+      - conversational_agent.api.endpoints:app 
+      - --host
+      - "0.0.0.0"
+      - --port 
+      - "5020"
       
     networks:
       conversational-agent-internal: {}
