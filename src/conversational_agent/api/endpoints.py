@@ -3,7 +3,8 @@ import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from conversational_agent.api.agent import router as pipeline_router
+from conversational_agent.api.agent import agent_router
+from conversational_agent.config.dependencies.postgres import init_db
 
 logger = logging.getLogger(__name__)
 
@@ -24,8 +25,12 @@ def app():
         allow_headers=["*"],
     )
 
-    fastapi_app.include_router(pipeline_router())
-
+    # Initialize DB on startup (create tables, etc.)
+    fastapi_app.add_event_handler("startup", init_db)
+    # Simple health check endpoint
     fastapi_app.add_api_route("/health", health, tags=["health"])
+
+    # Add routers for different API areas in the application
+    fastapi_app.include_router(agent_router())
 
     return fastapi_app

@@ -1,26 +1,63 @@
-import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from http.client import HTTPException
 from logging import getLogger
 
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from pydantic import Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
+from sqlalchemy.ext.asyncio import (
+    AsyncEngine,
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
+)
 from sqlmodel import SQLModel
+
+# Ensure models are imported so SQLModel metadata is populated
+import conversational_agent.data_models  # noqa: F401
+from conversational_agent.utils import singleton
 
 logger = getLogger(__name__)
 
-DATABASE_URL = os.getenv(
-    "DATABASE_URL", "postgresql+psycopg://postgres:postgres@localhost:5432/conversational_agent_db"
-)
 
-# Create async engine (using psycopg3)
-engine = create_async_engine(DATABASE_URL, echo=True, future=True)
+class DatabaseConfig(BaseSettings):
+    """Database configuration settings."""
+
+    # Use in-memory SQLite by default (use e.g PostgreSQL for robustness via env vars)
+    url: str = Field(default="sqlite+aiosqlite:///:memory:")
+
+    # Database config settings can be passed as env vars (e.g in .env file) and must match "DB_CONFIG__<ATTR__SUBATTR>"
+    model_config = SettingsConfigDict(
+        env_prefix="DB_CONFIG__",
+        env_nested_delimiter="__",
+        env_file=".env",
+        extra="ignore",  # Ignore unrecognized env vars in .env
+    )
+
+
+@singleton
+def get_db_config() -> DatabaseConfig:
+    """Get the database configuration."""
+    return DatabaseConfig()
+
+
+@singleton
+def create_engine() -> AsyncEngine:
+    """Create the SQLAlchemy engine."""
+    db_config = get_db_config()
+    return create_async_engine(db_config.url, echo=True, future=True)
+
+
+async def init_db() -> None:
+    """Initialize database tables."""
+    async with create_engine().begin() as conn:
+        await conn.run_sync(SQLModel.metadata.create_all)
 
 
 @asynccontextmanager
 async def get_session() -> AsyncIterator[AsyncSession]:
     """Context manager to get a new database session from the configured engine."""
-    session_maker = async_sessionmaker(engine, expire_on_commit=False)
+    session_maker = async_sessionmaker(create_engine(), expire_on_commit=False)
     session = session_maker()
     try:
         yield session
@@ -34,9 +71,3 @@ async def get_session() -> AsyncIterator[AsyncSession]:
         raise
     finally:
         await session.close()
-
-
-async def init_db() -> None:
-    """Initialize database tables."""
-    async with engine.begin() as conn:
-        await conn.run_sync(SQLModel.metadata.create_all)
