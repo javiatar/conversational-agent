@@ -16,6 +16,12 @@ x-api-healthcheck: &apiHealthcheck
   timeout: 10s
   retries: 20
 
+# * Postgres server environment variables
+x-db-server-environment: &postgresEnv
+  POSTGRES_USER: admin
+  POSTGRES_PASSWORD: admin
+  POSTGRES_DB: conversational_agent_db
+
 services:
   conversational-agent-api:
     image:  conversational-agent-api:latest
@@ -33,10 +39,35 @@ services:
       - "5020"
     env_file: 
       - ../../.env
+    depends_on:
+      postgres:
+        condition: service_healthy
     networks:
       conversational-agent-internal: {}
       conversational-agent-external: {}
     healthcheck: *apiHealthcheck
+
+  postgres:
+    image: postgres:17
+    environment:
+      <<: *postgresEnv
+    volumes:
+      - postgres-data:/var/lib/postgresql/data # Default PSQL data directory
+    ports:
+      - published: "5432"
+        target: "5432"
+    healthcheck:
+      test:
+        ["CMD", "pg_isready", "-h", "localhost", "-p", "5432", "-U", "admin", "-d", "conversational_agent_db"]
+      interval: 5s
+      retries: 5
+    networks:
+      conversational-agent-internal: {}
+      conversational-agent-external: {}
+
+volumes:
+  # Named volume to persist DB data between container restarts
+  postgres-data: {}
 
 networks:
   conversational-agent-internal: {}
