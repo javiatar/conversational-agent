@@ -5,4 +5,4 @@ services:
       context: ../../
       dockerfile: deployment/Dockerfile
       args:
-        BASE_IMAGE: python:3.12-slim-bookworm
+        BASE_IMAGE: python:3.12-slim

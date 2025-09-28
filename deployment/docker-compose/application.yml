@@ -39,6 +39,9 @@ services:
       - "5020"
     env_file: 
       - ../../.env
+    volumes:
+      # Mounts local storage directory into container (RAG)
+      - ../../storage:/app/storage
     depends_on:
       postgres:
         condition: service_healthy

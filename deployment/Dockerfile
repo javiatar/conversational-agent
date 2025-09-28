@@ -1,6 +1,6 @@
 ARG BASE_IMAGE
 
-FROM ${BASE_IMAGE:-"python:3.12-slim-bookworm"} AS common-env
+FROM ${BASE_IMAGE:-"python:3.12-slim"} AS common-env
 
 # Use standard site-packages location for all dependencies installed.
 ENV TARGET_DIR=/site-packages
@@ -38,11 +38,14 @@ RUN --mount=from=ghcr.io/astral-sh/uv,source=/uv,target=/bin/uv \
     uv pip install --no-deps /src --target=${TARGET_DIR}
 
 # Build from base to avoid pulling any build-time config into final image
-FROM ${BASE_IMAGE:-"python:3.12-slim-bookworm"} AS run
+FROM ${BASE_IMAGE:-"python:3.12-slim"} AS run
 # Use standard site-packages location for all dependencies installed.
 ENV TARGET_DIR=/site-packages
 # Ensure python searches for modules in our custom site-packages directory
 ENV PYTHONPATH=${TARGET_DIR}
+
+# Install java deps needed for RAG lucene
+RUN apt-get update && apt-get install -y openjdk-21-jdk
 
 # Copy the TARGET_DIR from each of the previous stages into this image
 COPY --from=deps-install ${TARGET_DIR}/. ${TARGET_DIR}/.
