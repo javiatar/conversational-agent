@@ -14,7 +14,14 @@ BASE_URL = "http://localhost:5020/agent"
 def log_in():
     print("Welcome! Please log in.")
     name = input("Enter your name: ").strip()
-    email = input("Enter your email: ").strip()
+    import re
+
+    email_pattern = r"^[\w\.-]+@[\w\.-]+\.\w+$"
+    while True:
+        email = input("Enter your email: ").strip()
+        if re.match(email_pattern, email):
+            break
+        print("❌ Invalid email format. Please try again.")
 
     payload = {"name": name, "email": email}
     response = requests.post(f"{BASE_URL}/log_in", json=payload)
