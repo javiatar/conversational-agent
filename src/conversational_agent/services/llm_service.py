@@ -13,7 +13,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from conversational_agent.config.dependencies.openai import get_openai_api_config
 from conversational_agent.data_models.api_models import ChatRequest, ChatResponse
-from conversational_agent.data_models.db_models import Conversation, IssueStatus, Role, Turn
+from conversational_agent.data_models.db_models import (
+    Conversation,
+    Issue,
+    IssueStatus,
+    Role,
+    Turn,
+    UrgencyLevel,
+)
 from conversational_agent.data_models.ml_models import OpenAIAPIIssueFormat
 from conversational_agent.utils import singleton
 
@@ -58,6 +65,12 @@ class LLMService:
                 break
             logger.warning(f"Had to re-do the API call... got back response_model: {model}")
 
+        # Handle issue creation or append depending on whether this conversation already has an issue associated
+        if model.create_issue and conversation.issue_id is None:
+            await self._create_issue(conversation, model, session)
+        elif model.create_issue and conversation.issue_id is not None:
+            await self._update_issue(conversation, model, session)
+
         status = model.status or IssueStatus.IN_PROGRESS
         match status:
             case IssueStatus.REQUIRES_MANUAL_REVIEW:
@@ -69,7 +82,7 @@ class LLMService:
                     f"Conversation {conversation_id} has ongoing/none status: {model.status}"
                 )
 
-        # 4. Save user + assistant turns
+        # Save assistant turn
         reply = model.assistant_reply
         assistant_turn = Turn(role=Role.ASSISTANT, text=reply, conversation_id=conversation_id)
         session.add(assistant_turn)
@@ -95,6 +108,56 @@ class LLMService:
                 case _:
                     raise ValueError(f"Unknown role: {turn.role}")
         return messages
+
+    async def _create_issue(
+        self, conversation: Conversation, model: OpenAIAPIIssueFormat, session: AsyncSession
+    ) -> Issue:
+        """Create a new issue based on the ML model decision and link it to the conversation that prompted it."""
+        if not model.description or not model.issue_type:
+            raise ValueError("Cannot create issue without description and issue_type")
+
+        new_issue = Issue(
+            customer_id=conversation.customer_id,
+            description=model.description,
+            issue_type=model.issue_type,
+            urgency=model.urgency or UrgencyLevel.MEDIUM,
+            status=model.status or IssueStatus.IN_PROGRESS,
+            order_number=model.order_number,
+        )
+        session.add(new_issue)
+
+        # Link issue to conversation
+        conversation.issue_id = new_issue.id
+        session.add(conversation)
+        logger.info(
+            f"Created new issue {new_issue.id} and linked to conversation {conversation.id}"
+        )
+        return new_issue
+
+    async def _update_issue(
+        self, conversation: Conversation, model: OpenAIAPIIssueFormat, session: AsyncSession
+    ) -> None:
+        """Update an existing issue linked to the conversation based on the ML model decision."""
+        if conversation.issue_id is None:
+            raise ValueError("No existing issue linked to conversation to update")
+
+        existing_issue = await session.get(Issue, conversation.issue_id)
+        if not existing_issue:
+            raise ValueError("Linked issue not found in database")
+
+        if model.description:
+            existing_issue.description = model.description
+        if model.issue_type:
+            existing_issue.issue_type = model.issue_type
+        if model.urgency:
+            existing_issue.urgency = model.urgency
+        if model.status:
+            existing_issue.status = model.status
+        if model.order_number:
+            existing_issue.order_number = model.order_number
+
+        session.add(existing_issue)
+        logger.info(f"Updated existing issue {existing_issue.id} with new information")
 
 
 @singleton

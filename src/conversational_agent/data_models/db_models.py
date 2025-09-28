@@ -6,6 +6,7 @@
     - Note: these turns are timestamped and used by the ML Agent to generate responses.
 - Each Issue can have 1 or more Conversations associated with it.
     - Note: not all conversations need to be linked to an issue, e.g. general inquiries.
+            but all Issues must have come from a Conversation
 """
 
 from datetime import datetime, timezone
@@ -89,13 +90,13 @@ class Issue(SQLModel, table=True):
     issue_type: IssueType = Field(default=IssueType.OTHER)
     urgency: UrgencyLevel = Field(default=UrgencyLevel.MEDIUM)
     status: IssueStatus = Field(default=IssueStatus.IN_PROGRESS)
-    order_number: str | None = Field(default=None, description="Optional order number")
+    order_number: int | None = Field(default=None, description="Optional order number")
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
     # Each issue is linked to a customer (who can have 0+ issues)
     customer_id: UUID = Field(foreign_key="customer.id")
     customer: Customer = Relationship(back_populates="issues")
 
-    # Each issue can have 0+ conversations, expecting at least 1
+    # Each issue must have 1+ conversations associated with it
     # NO CASCADE: Keep conversations when issue is deleted
     conversations: list["Conversation"] = Relationship(back_populates="issue")
