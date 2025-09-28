@@ -104,10 +104,6 @@ ENV/
 # IDE settings
 .idea/
 
-# Want to keep storage/ folder only
-/storage/*
-!/storage/.gitkeep
-
 # pdm
 .pdm*
 
