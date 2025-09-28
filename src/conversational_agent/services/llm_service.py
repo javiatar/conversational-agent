@@ -11,8 +11,7 @@ from openai.types.chat import (
 )
 from sqlalchemy.ext.asyncio import AsyncSession
 
-# Ensure models are imported so SQLModel metadata is populated
-import conversational_agent.data_models  # noqa: F401
+from conversational_agent.config.dependencies.openai import get_openai_api_config
 from conversational_agent.data_models.api_models import ChatRequest, ChatResponse
 from conversational_agent.data_models.db_models import Conversation, IssueStatus, Role, Turn
 from conversational_agent.data_models.ml_models import OpenAIAPIIssueFormat
@@ -25,7 +24,8 @@ class LLMService:
     _model_name: str = "gpt-5-nano"  # Cheap, fast
 
     def __init__(self):
-        self._client = AsyncOpenAI()
+        openai_config = get_openai_api_config()
+        self._client = AsyncOpenAI(api_key=openai_config.key)
 
     async def chat(
         self, conversation_id: UUID, request: ChatRequest, session: AsyncSession
