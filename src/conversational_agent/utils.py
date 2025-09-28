@@ -1,3 +1,6 @@
+from pathlib import Path
+
+
 def singleton(callable_obj):
     """A simple singleton decorator for classes/functions and other callable objects."""
     instances = {}
@@ -8,3 +11,6 @@ def singleton(callable_obj):
         return instances[callable_obj]
 
     return wrapper
+
+
+STORAGE_PATH = Path(__file__).parent.parent.parent / "storage"

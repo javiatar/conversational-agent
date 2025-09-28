@@ -3,7 +3,8 @@ import logging
 from fastapi import FastAPI
 from pydantic import BaseModel
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
 
 
 def include_models(app: FastAPI, /, *models: type[BaseModel]):

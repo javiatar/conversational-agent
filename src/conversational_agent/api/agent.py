@@ -16,7 +16,8 @@ from conversational_agent.data_models.db_models import Customer
 from conversational_agent.services.agent_service import get_agent_service
 from conversational_agent.services.llm_service import get_llm_service
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
 
 
 def agent_router():

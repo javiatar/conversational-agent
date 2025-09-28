@@ -6,7 +6,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from conversational_agent.api.agent import agent_router
 from conversational_agent.config.dependencies.database import init_db
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
 
 
 async def health():

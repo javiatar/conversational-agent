@@ -1,6 +1,6 @@
 """Fake frontend for testing purposes"""
 
-from logging import getLogger
+import logging
 from typing import cast
 
 import requests
@@ -8,7 +8,8 @@ from typing_extensions import Literal
 
 from conversational_agent.data_models.db_models import IssueStatus
 
-logger = getLogger(__name__)
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
 
 BASE_URL = "http://localhost:5020/agent"
 

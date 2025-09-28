@@ -22,6 +22,7 @@ from conversational_agent.data_models.db_models import (
     UrgencyLevel,
 )
 from conversational_agent.data_models.ml_models import OpenAIAPIIssueFormat
+from conversational_agent.services.rag_service import RAGService
 from conversational_agent.utils import singleton
 
 logger = getLogger(__name__)
@@ -33,6 +34,7 @@ class LLMService:
     def __init__(self):
         openai_config = get_openai_api_config()
         self._client = AsyncOpenAI(api_key=openai_config.key)
+        self._rag_service = RAGService()
 
     async def chat(
         self, conversation_id: UUID, request: ChatRequest, session: AsyncSession
@@ -48,8 +50,12 @@ class LLMService:
         await session.flush()
         await session.refresh(conversation, ["turns"])
 
+        # Attempt to get relevant context
+        context = (
+            await self._get_ongoing_context(request.message) if self._rag_service.enabled else None
+        )
         turns = conversation.turns
-        openai_messages = self._convert_turns_to_openai(turns)
+        openai_messages = self._convert_turns_to_openai(turns, context)
 
         # Call the OpenAI API
         model = None
@@ -65,6 +71,28 @@ class LLMService:
                 break
             logger.warning(f"Had to re-do the API call... got back response_model: {model}")
 
+        await self._handle_model_decision(conversation, model, session)
+
+        # Save assistant turn
+        reply = model.assistant_reply
+        assistant_turn = Turn(role=Role.ASSISTANT, text=reply, conversation_id=conversation_id)
+        session.add(assistant_turn)
+        return ChatResponse(
+            reply=reply,
+            status=model.status or IssueStatus.IN_PROGRESS,
+        )
+
+    async def _get_ongoing_context(self, query: str) -> str | None:
+        docs = self._rag_service.search(query)
+        if not docs:
+            logger.debug("No RAG documents found for context.")
+            return None
+        logger.info(f"Found {len(docs)} RAG documents for context.")
+        return self._rag_service.format_context(docs)
+
+    async def _handle_model_decision(
+        self, conversation: Conversation, model: OpenAIAPIIssueFormat, session: AsyncSession
+    ):
         # Handle issue creation or append depending on whether this conversation already has an issue associated
         if model.create_issue and conversation.issue_id is None:
             await self._create_issue(conversation, model, session)
@@ -74,22 +102,13 @@ class LLMService:
         status = model.status or IssueStatus.IN_PROGRESS
         match status:
             case IssueStatus.REQUIRES_MANUAL_REVIEW:
-                logger.warning(f"Conversation {conversation_id} requires manual review per model.")
+                logger.info(f"Conversation {conversation.id} requires manual review per model.")
             case IssueStatus.RESOLVED | IssueStatus.CLOSED:
-                logger.info(f"Conversation {conversation_id} marked as resolved by model.")
+                logger.info(f"Conversation {conversation.id} marked as resolved by model.")
             case _:
                 logger.info(
-                    f"Conversation {conversation_id} has ongoing/none status: {model.status}"
+                    f"Conversation {conversation.id} has in_progress/none status: {model.status}"
                 )
-
-        # Save assistant turn
-        reply = model.assistant_reply
-        assistant_turn = Turn(role=Role.ASSISTANT, text=reply, conversation_id=conversation_id)
-        session.add(assistant_turn)
-        return ChatResponse(
-            reply=reply,
-            status=status,
-        )
 
     async def summarize_conversation(self, converation_id: UUID, session: AsyncSession) -> str:
         # Get the conversation requested and associated turns
@@ -125,7 +144,9 @@ class LLMService:
             )
         return reply
 
-    def _convert_turns_to_openai(self, turns: list[Turn]) -> list[ChatCompletionMessageParam]:
+    def _convert_turns_to_openai(
+        self, turns: list[Turn], context: str | None = None
+    ) -> list[ChatCompletionMessageParam]:
         messages: list[ChatCompletionMessageParam] = []
         for turn in turns:
             match turn.role.value.lower():
@@ -136,9 +157,14 @@ class LLMService:
                         ChatCompletionAssistantMessageParam(role="assistant", content=turn.text)
                     )
                 case "system":
-                    messages.append(
-                        ChatCompletionSystemMessageParam(role="system", content=turn.text)
-                    )
+                    # Conditionally inject context to the system prompt if provided
+                    text = turn.text
+                    if context and "{context}" in text:
+                        text = text.format(context=context)
+                        logger.info(
+                            f"Injected RAG context into system prompt. New system prompt: {text}"
+                        )
+                    messages.append(ChatCompletionSystemMessageParam(role="system", content=text))
                 case _:
                     raise ValueError(f"Unknown role: {turn.role}")
         return messages
