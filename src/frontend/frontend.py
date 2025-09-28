@@ -34,7 +34,7 @@ def start_conversation(customer_id: str) -> str:
     response = requests.post(f"{BASE_URL}/start_conversation", json=payload)
     response.raise_for_status()
     data = response.json()
-    print(f"\n🤖 Agent: {data['message']}")
+    print(f"\n🤖 Agent: {data['message'].encode('utf-8').decode('unicode_escape')}")
     return data["conversation_id"]
 
 
