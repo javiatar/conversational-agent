@@ -91,6 +91,40 @@ class LLMService:
             status=status,
         )
 
+    async def summarize_conversation(self, converation_id: UUID, session: AsyncSession) -> str:
+        # Get the conversation requested and associated turns
+        conversation = await session.get(Conversation, converation_id)
+        if not conversation:
+            raise HTTPException(404, "Conversation not found")
+
+        await session.refresh(conversation, ["turns"])
+        turns = conversation.turns
+        # Remove previous system to avoid model confusing its objective
+        openai_messages = self._convert_turns_to_openai(
+            [turn for turn in turns if turn.role != Role.SYSTEM]
+        )
+
+        while True:
+            # Call the OpenAI API for summary
+            response = await self._client.chat.completions.create(
+                model=self._model_name,
+                messages=openai_messages
+                + [
+                    ChatCompletionSystemMessageParam(
+                        role="system",
+                        content="Provide a concise summary of the conversation in 2-3 sentences.",
+                    )
+                ],
+            )
+            reply = response.choices[0].message.content
+
+            if reply:
+                break
+            logger.warning(
+                f"Had to re-do the API call for summary... got back nully reply: {reply}"
+            )
+        return reply
+
     def _convert_turns_to_openai(self, turns: list[Turn]) -> list[ChatCompletionMessageParam]:
         messages: list[ChatCompletionMessageParam] = []
         for turn in turns:

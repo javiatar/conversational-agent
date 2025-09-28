@@ -45,4 +45,9 @@ def agent_router():
         service = get_llm_service()
         return await service.chat(conversation_id, request, session)
 
+    @router.get("/{conversation_id}/summary")
+    async def conversation_summary(conversation_id: UUID, session: SessionDep) -> str:
+        service = get_llm_service()
+        return await service.summarize_conversation(conversation_id, session)
+
     return router
