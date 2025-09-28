@@ -89,6 +89,7 @@ class Issue(SQLModel, table=True):
     issue_type: IssueType = Field(default=IssueType.OTHER)
     urgency: UrgencyLevel = Field(default=UrgencyLevel.MEDIUM)
     status: IssueStatus = Field(default=IssueStatus.IN_PROGRESS)
+    order_number: str | None = Field(default=None, description="Optional order number")
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
     # Each issue is linked to a customer (who can have 0+ issues)

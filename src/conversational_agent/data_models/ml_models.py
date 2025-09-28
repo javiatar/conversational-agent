@@ -44,6 +44,7 @@ class OpenAIAPIIssueFormat(BaseModel):
     issue_type: IssueType | None = Field(None, description="Type of issue")
     urgency: UrgencyLevel | None = Field(None, description="Urgency level of the issue")
     status: IssueStatus | None = Field(None, description="Current status of the issue")
+    order_number: str | None = Field(None, description="Optional order number")
 
     assistant_reply: str | None = Field(
         ..., description="The assistant's conversational reply to the user"
