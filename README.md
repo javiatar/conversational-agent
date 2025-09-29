@@ -1,62 +1,114 @@
 # Conversational Agent
 
-This repository contains the 'Conversational Agent' take home exercise.
+This repository contains a conversational agent service that provides intelligent customer support with RAG (Retrieval-Augmented Generation) capabilities. The agent can triage customer issues, extract relevant information, and provide contextually aware responses using a knowledge base.
 
-## Usage Tutorial: Set up your environment to work with this repo
-Set up env via:
+## TL;DR - Quick Start
 
-1. Open this repo in a new VSCode workspace:
-    ```sh
-    code relative/path/to/this/repo
-    ```
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/javiatar/conversational-agent.git
+   cd conversational-agent
+   ```
 
-1. Create and source a venv
-    ```sh
-    uv venv
-    source .venv/bin/activate
-    ```
+2. Create `.env` file with your OpenAI API key:
+   ```bash
+   echo 'export OPENAI_API__KEY="your-openai-api-key-here"' > .env
+   ```
 
-1. Install project dependencies on that venv from `pyproject.toml`:
-    ```sh
-    uv sync --active --group dev
-    ```
+3. Install uvx (if you don't have it):
+   ```bash
+   curl -LsSf https://astral.sh/uv/install.sh | sh
+   # or
+   pip install uvx
+   ```
 
-## Usage Tutorial: Spinning up your new Conversational Agent Application
-Below we'll go over how to use docker and curl to create the Conversational Agent Application's container images, spin them up, and issue requests to those containers' API endpoints to see the bricks backend in action. To bypass docker and run your modules
-directly (e.g during development) skip to the Local Development section below.
+4. Start the application:
+   ```bash
+   uvx nox -s docker_up
+   ```
 
-1. Create the docker container images for the Conversational Agent application.
-    ```sh
-    uvx nox -s docker_build
-    ```
+5. Test the API:
+   ```bash
+   # Run the interactive 'fake' CLI frontend:
+   python src/frontend/frontend.py
+   ```
 
-2. Spin up your built application containers, including an API container that will expose a set of endpoints to interface with the conversational agent.
-    ```sh
-    uvx nox -s docker_up
-    ```
+The API will be available at `http://localhost:5020` with documentation at `/docs`.
 
-3. In a new terminal, issue a request to the Conversational Agent Application's API endpoint, exposed by default on port 5020:
-    ```sh
-    curl localhost:5020/health | jq
-    ```
-      - Expecting: `{"status":"ok!"}`
+## Detailed Setup Instructions
 
-4. Peruse other endpoints provisoned on your API by going to `http://localhost:5020/docs` on your browser
+### Prerequisites
 
-### Local Development
-If you want to test running your application outside a docker container, you can do that like so:
+- **Docker & Docker Compose**: For containerized deployment
+- **uvx**: Python package runner (installs automatically with uv)
+- **OpenAI API Key**: Required for LLM functionality
 
-1. Check that you don't have another instance of your app running
+### Architecture Overview
 
-1. Ensure that you're running in a virtual environment with your dependencies installed
+This application uses Docker Compose to orchestrate multiple services:
 
-2. In a terminal, run the following:
-    ```sh
-    python3 -m uvicorn conversational_agent.api.endpoints:app --host 0.0.0.0 --port 5020
-    ```
+- **API Container**: FastAPI application with the conversational agent
+- **PostgreSQL Container**: Database for storing conversations, customers, and issues
+- **Shared Volumes**: For RAG knowledge base and indexes
 
-3. In a separate terminal, you may issue requests to [all available endpoints](http://localhost:5020/docs), as explained above, like so:
-    ```sh
-    curl localhost:5020/health | jq
-    ```
-    - Expecting: `{"status":"ok!"}`
+### Environment Configuration
+
+Create a `.env` file in the root directory with the following variables:
+
+```bash
+# Required: OpenAI API key for LLM functionality
+export OPENAI_API__KEY="your-openai-api-key-here"
+# Required: Database connection URL (points to Docker PostgreSQL container)
+export DB_CONFIG__URL="postgresql+psycopg://admin:admin@postgres:5432/conversational_agent_db"
+# Optional: Enable RAG (Retrieval-Augmented Generation) for enhanced responses
+export RAG__ENABLED=True # Default is False
+```
+
+### Step-by-Step Installation
+
+1. Clone and navigate to the repository, install uvx, and create `.env` file as above
+
+   ```bash
+   git clone https://github.com/javiatar/conversational-agent.git
+   cd conversational-agent
+   ```
+
+1. Build and start all services:
+
+   ```bash
+   # This command will:
+   # - Build the Docker image with all dependencies
+   # - Start PostgreSQL database container
+   # - Start the API container
+   # - Set up networking between containers
+   uvx nox -s docker_up
+   ```
+
+1. Verify the installation:
+
+   ```bash
+   # Check API health
+   curl http://localhost:5020/health
+   # visit http://localhost:5020/docs in your browser
+   ```
+
+### What Gets Started
+
+When you run `uvx nox -s docker_up`, the following happens:
+
+1. **Docker Image Build**: 
+   - Installs Python 3.12 and dependencies
+   - Installs Java 21 (required for RAG/Pyserini)
+   - Copies your application code
+
+1. **PostgreSQL Container**:
+   - Starts on port 5432
+   - Creates database `conversational_agent_db`
+   - User: `admin`, Password: `admin`
+   - Data persists in Docker volume `postgres-data`
+
+1. **API Container**:
+   - Starts on port 5020
+   - Mounts local `storage/` directory for RAG indexes
+   - Connects to PostgreSQL container via internal networking
+   - Initializes database tables on startup
